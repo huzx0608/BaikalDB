@@ -32,6 +32,7 @@
 namespace baikaldb {
 DECLARE_int32(meta_port);
 DECLARE_string(meta_server_bns);
+DECLARE_string(meta_server_ipaddr);
 DECLARE_int32(meta_replica_number);
 }
 
@@ -58,7 +59,10 @@ int main(int argc, char **argv) {
     //add service
     brpc::Server server;
     butil::EndPoint addr;
-    addr.ip = butil::IP_ANY;
+
+    butil::ip_t localAddr;
+    butil::str2ip("172.20.3.18", &localAddr);
+    addr.ip = localAddr;
     addr.port = baikaldb::FLAGS_meta_port;
     //将raft加入到baidu-rpc server中
     if (0 != braft::add_service(&server, addr)) {

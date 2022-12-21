@@ -166,7 +166,10 @@ int main(int argc, char **argv) {
 
     //add service
     butil::EndPoint addr;
-    addr.ip = butil::IP_ANY;
+    butil::ip_t localIp;
+    butil::str2ip("172.20.3.18", &localIp);
+    // addr.ip = butil::IP_ANY;
+    addr.ip = localIp;
     addr.port = baikaldb::FLAGS_store_port;
     //将raft加入到baidu-rpc server中
     if (0 != braft::add_service(&server, addr)) { 

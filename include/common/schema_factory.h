@@ -1007,7 +1007,9 @@ private:
         _is_inited = false;
         bthread_mutex_init(&_update_show_db_mutex, NULL);
         butil::EndPoint addr;
-        addr.ip = butil::my_ip();
+        butil::ip_t localIp;
+        butil::str2ip("172.20.3.18", &localIp);
+        addr.ip = localIp;
         addr.port = 0;
         std::string address = endpoint2str(addr).c_str(); 
         auto ret = get_physical_room(address, _physical_room);

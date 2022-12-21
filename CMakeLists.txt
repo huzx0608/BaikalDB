@@ -16,10 +16,10 @@ cmake_minimum_required(VERSION 3.2)
 project(BaikalDB C CXX)
 
 option(WITH_BAIKAL_CLIENT "build baikal-client" ON)
-option(DEBUG "Print debug logs" OFF)
+option(DEBUG "Print debug logs" ON)
 option(WITH_SYSTEM_LIBS "use system installed headers and libraries instead of auto dependency" OFF)
-option(WITH_DEBUG_SYMBOLS "With debug symbols" OFF)
-option(WITH_TESTS "With tests" OFF)
+option(WITH_DEBUG_SYMBOLS "With debug symbols" ON)
+option(WITH_TESTS "With tests" ON)
 option(WITH_GPERF "Link tcmalloc and profiler" ON)
 
 message(STATUS "CXX compiler: ${CMAKE_CXX_COMPILER}, version: "

@@ -91,7 +91,9 @@ Store::~Store() {
 
 int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
     butil::EndPoint addr;
-    addr.ip = butil::my_ip();
+    butil::ip_t localIp;
+    butil::str2ip("172.20.3.18", &localIp);
+    addr.ip = localIp;
     addr.port = FLAGS_store_port; 
     _address = endpoint2str(addr).c_str(); 
     if (_meta_server_interact.init() != 0) {

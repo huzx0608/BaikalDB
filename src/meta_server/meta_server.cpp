@@ -68,7 +68,9 @@ int MetaServer::init(const std::vector<braft::PeerId>& peers) {
         return -1;
     }
     butil::EndPoint addr;
-    addr.ip = butil::my_ip();
+    butil::ip_t ipAddr;
+    butil::str2ip("172.20.3.18", &ipAddr);
+    addr.ip = ipAddr;
     addr.port = FLAGS_meta_port;
     braft::PeerId peer_id(addr, 0);
     _meta_state_machine = new (std::nothrow)MetaStateMachine(peer_id);

@@ -877,9 +877,12 @@ bool NetworkServer::init() {
     _driver_thread_num = bthread::FLAGS_bthread_concurrency;
     TimeCost cost;
     butil::EndPoint addr;
-    addr.ip = butil::my_ip();
+    butil::ip_t localIp;
+    butil::str2ip("172.20.3.18", &localIp);
+    addr.ip = localIp;
     addr.port = FLAGS_baikal_port; 
     std::string address = endpoint2str(addr).c_str(); 
+    std::cout << "Huzx=====>" << address.c_str() << std::endl;
     int ret = get_physical_room(address, _physical_room);
     if (ret < 0) {
         DB_FATAL("get physical room fail");

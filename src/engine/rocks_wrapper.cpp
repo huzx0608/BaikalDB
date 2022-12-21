@@ -64,7 +64,7 @@ DEFINE_int32(target_file_size_base, 128 * 1024 * 1024, "target_file_size_base");
 DEFINE_int32(addpeer_rate_limit_level, 1, "addpeer_rate_limit_level; "
         "0:no limit, 1:limit when stalling, 2:limit when compaction pending. default(1)");
 DEFINE_bool(delete_files_in_range, true, "delete_files_in_range");
-DEFINE_bool(l0_compaction_use_lz4, true, "L0 sst compaction use lz4 or not");
+DEFINE_bool(l0_compaction_use_lz4, false, "L0 sst compaction use lz4 or not");
 DEFINE_bool(real_delete_old_binlog_cf, true, "default true");
 DEFINE_bool(rocksdb_fifo_allow_compaction, false, "default false");
 
@@ -162,7 +162,7 @@ int32_t RocksWrapper::init(const std::string& path) {
     _binlog_cf_option.prefix_extractor.reset(
             rocksdb::NewFixedPrefixTransform(sizeof(int64_t)));
     _binlog_cf_option.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
-    _binlog_cf_option.compression = rocksdb::kLZ4Compression;
+    // _binlog_cf_option.compression = rocksdb::kLZ4Compression;
     _binlog_cf_option.compression_opts.enabled = true;
     _binlog_cf_option.compaction_style = rocksdb::kCompactionStyleFIFO;
     _binlog_cf_option.max_write_buffer_number_to_maintain = _binlog_cf_option.max_write_buffer_number;

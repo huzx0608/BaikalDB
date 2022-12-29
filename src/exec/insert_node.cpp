@@ -126,6 +126,7 @@ int InsertNode::open(RuntimeState* state) {
         }
     }
 
+    DB_WARNING("huzx=> insertNode: cnt: %d", _records.size());
     for (auto& record : _records) {
         ret = insert_row(state, record);
         if (ret < 0) {

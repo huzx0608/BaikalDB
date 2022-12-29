@@ -1686,7 +1686,11 @@ void TableManager::send_create_table_request(const std::string& namespace_name,
                 success = false;
                 return;
             }
-            DB_NOTICE("new region_id: %ld success, table_name:%s", region_id, full_table_name.c_str());
+            DB_NOTICE("Huzx=>new region_id: %ld success, table_name:%s, peerId:%s, request:%s",
+                      region_id,
+                      full_table_name.c_str(),
+                      init_region_request.region_info().leader().c_str(),
+                      init_region_request.ShortDebugString().c_str());
         };
         if (!success) {
             break;

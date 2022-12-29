@@ -44,6 +44,9 @@ int TransactionNode::open(RuntimeState* state) {
             return -1;
         }
     }
+    DB_WARNING("Huzx=> regionId:%ld, txnCmd:%s, txnId:%ld",
+               region_id,
+               pb::TxnCmdType_Name(_txn_cmd).c_str())
     if (_txn_cmd == pb::TXN_PREPARE) {
         // for autocommit dml cmds
         auto txn = txn_pool->get_txn(state->txn_id);
@@ -52,6 +55,7 @@ int TransactionNode::open(RuntimeState* state) {
             return -1;
         }
         auto res = txn->prepare();
+        DB_WARNING("Huzx=> txId:%ld prepare on region:%ld", state->txn_id, region_id);
         if (res.ok()) {
             //DB_WARNING_STATE(state, "prepare success, region_id: %ld, txn_id: %lu:%d", region_id, state->txn_id, state->seq_id);
             ret = txn->dml_num_affected_rows; // for autocommit dml, affected row is returned in commit node
@@ -69,6 +73,7 @@ int TransactionNode::open(RuntimeState* state) {
         return ret;
     } else if (_txn_cmd == pb::TXN_BEGIN_STORE) {
         SmartTransaction txn;
+        DB_WARNING("Huzx=> txId:%ld begin transaction on region:%ld", state->txn_id, region_id);
         ret = txn_pool->begin_txn(state->txn_id, txn, state->primary_region_id(), _txn_timeout);
         if (ret != 0) {
             DB_WARNING_STATE(state, "create txn failed: %lu:%d", state->txn_id, state->seq_id);
@@ -84,12 +89,13 @@ int TransactionNode::open(RuntimeState* state) {
             return -1;
         }
         auto res = txn->commit();
+        DB_WARNING("Huzx=> txId:%ld region:%ld commit transaction!", state->txn_id, region_id);
         if (res.ok()) {
-            //DB_WARNING_STATE(state, "txn commit success, region_id: %ld, txn_id: %lu, seq_id:%d", 
-            //    region_id, state->txn_id, state->seq_id);
+            DB_WARNING_STATE(state, "Huzx=>txn commit success, region_id: %ld, txn_id: %lu, seq_id:%d",
+                             region_id, state->txn_id, state->seq_id);
             ret = txn->dml_num_affected_rows; // for autocommit dml, affected row is returned in commit node
         } else if (res.IsExpired()) {
-            DB_WARNING_STATE(state, "txn expired when commit, region_id: %ld, txn_id: %lu, seq_id:%d", 
+            DB_WARNING_STATE(state, "Huzx=>txn expired when commit, region_id: %ld, txn_id: %lu, seq_id:%d",
                 region_id, state->txn_id, state->seq_id);
             ret = -1;
         } else {
@@ -99,6 +105,7 @@ int TransactionNode::open(RuntimeState* state) {
         }
         txn_pool->remove_txn(state->txn_id, true);
         TxnLimitMap::get_instance()->erase(state->txn_id);
+        DB_WARNING("Huzx=> commit txn:%ld regionId:%ld success", state->txn_id, region_id);
         return ret;
     } else if (_txn_cmd == pb::TXN_ROLLBACK_STORE) {
         // TODO: rollback failure can be simply ignored

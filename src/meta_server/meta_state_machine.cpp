@@ -65,6 +65,7 @@ void MetaStateMachine::store_heartbeat(google::protobuf::RpcController* controll
     response->set_errmsg("success");
     TimeCost step_time_cost;
     //判断instance是否是新增，同时更新instance的容量信息
+    DB_WARNING("Huzx=> receive heartbeat request:%s", request->DebugString().c_str());
     ClusterManager::get_instance()->process_instance_heartbeat_for_store(request->instance_info());
     ClusterManager::get_instance()->process_instance_param_heartbeat_for_store(request, response);
     int64_t instance_time = step_time_cost.get_time();
@@ -93,6 +94,8 @@ void MetaStateMachine::store_heartbeat(google::protobuf::RpcController* controll
     _store_heart_beat << time_cost.get_time();
     DB_DEBUG("store_heart_beat req[%s]", request->DebugString().c_str());
     DB_DEBUG("store_heart_beat resp[%s]", response->DebugString().c_str());
+
+    DB_WARNING("Huzx=> store heartbeat response:%s", response->DebugString().c_str());
 
     DB_NOTICE("store:%s heart beat, time_cost: %ld, "
                 "instance_time: %ld, peer_balance_time: %ld, schema_time: %ld,"

@@ -287,6 +287,7 @@ int ExecNode::create_tree(const pb::Plan& plan, int* idx, ExecNode* parent,
 }
 
 int ExecNode::create_exec_node(const pb::PlanNode& node, ExecNode** exec_node) {
+    DB_WARNING("Huzx=> create exec node:%s", pb::PlanNodeType_Name(node.node_type()).c_str())
     switch (node.node_type()) {
         case pb::SCAN_NODE:
             *exec_node = ScanNode::create_scan_node(node);

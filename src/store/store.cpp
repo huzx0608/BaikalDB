@@ -238,7 +238,7 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
         }
     }
 
-    _db_statistic_bth.run([this]() {start_db_statistics();});
+    // _db_statistic_bth.run([this]() {start_db_statistics();});
     DB_WARNING("store init_before_listen success, region_size:%lu, doing_snapshot_regions_size:%lu"
             "heartbeat_process_time:%ld new_region_process_time:%ld",
            init_region_ids.size(), doing_snapshot_regions.size(), heartbeat_process_time, new_region_process_time);
@@ -1726,6 +1726,8 @@ void Store::construct_heart_beat_request(pb::StoreHeartBeatRequest& request) {
 }
 
 void Store::process_heart_beat_response(const pb::StoreHeartBeatResponse& response) {
+    DB_WARNING("HUZX=> receive heartbeat response:%s", response.DebugString().c_str());
+
     {
         BAIDU_SCOPED_LOCK(_param_mutex);
         std::unordered_map<std::string, std::string> rocks_options;

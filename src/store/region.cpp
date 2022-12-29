@@ -439,9 +439,9 @@ int Region::execute_cached_cmd(const pb::StoreReq& request, pb::StoreRes& respon
     }
     const pb::TransactionInfo& txn_info = request.txn_infos(0);
     int last_seq = (txn == nullptr)? 0 : txn->seq_id();
-    //DB_WARNING("TransactionNote: region_id: %ld, txn_id: %lu, op_type: %d, "
-    //        "last_seq: %d, cache_plan_size: %d, log_id: %lu",
-    //        _region_id, txn_id, request.op_type(), last_seq, txn_info.cache_plans_size(), log_id);
+    DB_WARNING("Huzx=>TransactionNote: region_id: %ld, txn_id: %lu, op_type: %d, "
+            "last_seq: %d, cache_plan_size: %d, log_id: %lu",
+            _region_id, txn_id, request.op_type(), last_seq, txn_info.cache_plans_size(), log_id);
 
     // executed the cached cmd from last_seq + 1
     for (auto& cache_item : txn_info.cache_plans()) {
@@ -462,16 +462,17 @@ int Region::execute_cached_cmd(const pb::StoreReq& request, pb::StoreRes& respon
         }
         int seq_id = cache_item.seq_id();
         if (seq_id <= last_seq) {
-            //DB_WARNING("TransactionNote: txn %ld_%lu:%d has been executed.", _region_id, txn_id, seq_id);
+            DB_WARNING("Huzx=>TransactionNote: txn %ld_%lu:%d has been executed.", _region_id, txn_id, seq_id);
             continue;
         } else {
-            //DB_WARNING("TransactionNote: txn %ld_%lu:%d executed cached. op_type: %d",  
-            //    _region_id, txn_id, seq_id, op_type);
+            DB_WARNING("Huzx=>TransactionNote: txn %ld_%lu:%d executed cached. op_type: %d",
+                _region_id, txn_id, seq_id, op_type);
         }
         
         // normally, cache plan should be execute successfully, because it has been executed 
         // on other peers, except for single-stmt transactions
         pb::StoreRes res;
+        DB_WARNING("Huzx=> opType:%s, request:%s", pb::OpType_Name(op_type).c_str(), request.DebugString().c_str());
         if (op_type != pb::OP_SELECT_FOR_UPDATE) {
             dml_2pc(request, op_type, plan, tuples, res, applied_index, term, seq_id, false);
         } else {
@@ -528,6 +529,7 @@ void Region::exec_txn_complete(google::protobuf::RpcController* controller,
             pb::StoreRes* response,
             google::protobuf::Closure* done) {
     brpc::ClosureGuard done_guard(done);
+    DB_WARNING("Receive Exec TXN complete:%s", request->DebugString().c_str());
     for (auto txn_id : request->rollback_txn_ids()) {
         SmartTransaction txn = _txn_pool.get_txn(txn_id);
         if (txn != nullptr) {
@@ -897,6 +899,10 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
                 return;
             }
             pb::StoreReq* raft_req = nullptr;
+            DB_WARNING("Huzx==> current op type:%d, request:%s, response:%s",
+                       op_type,
+                       request->DebugString().c_str(),
+                       response->DebugString().c_str());
             if (is_dml_op_type(op_type)) {
                 dml(*request, *response, (int64_t)0, (int64_t)0, false);
                 if (response->errcode() != pb::SUCCESS) {
@@ -934,6 +940,9 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
             } else {
                 ret = raft_req->SerializeToZeroCopyStream(&wrapper);
             }
+            DB_WARNING("Huzx=> execute struction in raft:%d request:%s",
+                       (raft_req == nullptr),
+                       (raft_req == nullptr) ? request->DebugString().c_str() : raft_req->DebugString().c_str());
             if (ret < 0) {
                 apply_success = false;
                 cntl->SetFailed(brpc::EREQUEST, "Fail to serialize request");
@@ -1488,6 +1497,7 @@ void Region::query(google::protobuf::RpcController* controller,
             if (request->txn_infos_size() > 0) {
                 txn_id = request->txn_infos(0).txn_id();
             }
+            DB_WARNING("Huzx=> receive transaction:id:%d, request:%s", txn_id, request->DebugString().c_str());
             if (txn_id == 0 || request->op_type() == pb::OP_TRUNCATE_TABLE) {
                 exec_out_txn_query(controller, request, response, done_guard.release());
             } else {
@@ -1559,6 +1569,10 @@ void Region::dml(const pb::StoreReq& request, pb::StoreRes& response,
         optimize_1pc = request.txn_infos(0).optimize_1pc();
         seq_id = request.txn_infos(0).seq_id();
     }
+    DB_WARNING("Huzx=> optimize_1pc: %d, seq_id:%d, request:%s",
+               optimize_1pc,
+               seq_id,
+               request.DebugString().c_str());
     if ((request.op_type() == pb::OP_PREPARE) && optimize_1pc) {
         dml_1pc(request, request.op_type(), request.plan(), request.tuples(), 
             response, applied_index, term, nullptr);
@@ -1600,7 +1614,7 @@ void Region::dml_2pc(const pb::StoreReq& request,
     }
 
     TimeCost cost;
-    //DB_WARNING("num_prepared:%d region_id: %ld", num_prepared(), _region_id);
+    DB_WARNING("Huzx=>num_prepared:%d region_id: %ld", num_prepared(), _region_id);
     std::set<int> need_rollback_seq;
     if (request.txn_infos_size() == 0) {
         response.set_errcode(pb::EXEC_FAIL);
@@ -1672,19 +1686,19 @@ void Region::dml_2pc(const pb::StoreReq& request,
         }
         _commit_meta_mutex.lock();  
         _meta_writer->write_pre_commit(_region_id, txn_id, num_table_lines, applied_index);
-        //DB_WARNING("region_id: %ld lock and write_pre_commit success,"
-        //            " num_table_lines: %ld, applied_index: %ld , txn_id: %lu, op_type: %s",
-        //            _region_id, num_table_lines, applied_index, txn_id, pb::OpType_Name(op_type).c_str());
+        DB_WARNING("Huzx=>region_id: %ld lock and write_pre_commit success,"
+                   " num_table_lines: %ld, applied_index: %ld , txn_id: %lu, op_type: %s",
+                   _region_id, num_table_lines, applied_index, txn_id, pb::OpType_Name(op_type).c_str());
     }
     ON_SCOPE_EXIT(([this, op_type, applied_index, txn_id, txn_info, need_write_rollback]() {
         if (op_type == pb::OP_COMMIT || op_type == pb::OP_ROLLBACK) {
             auto ret = _meta_writer->write_meta_after_commit(_region_id, _num_table_lines,
                             applied_index, _data_index, txn_id, need_write_rollback);
-            //DB_WARNING("write meta info wheen commit or rollback,"
-            //            " region_id: %ld, applied_index: %ld, num_table_line: %ld, txn_id: %lu"
-            //            "op_type: %s", 
-            //            _region_id, applied_index, _num_table_lines.load(), 
-            //            txn_id, pb::OpType_Name(op_type).c_str()); 
+            DB_WARNING("Huzx=>write meta info wheen commit or rollback,"
+                        " region_id: %ld, applied_index: %ld, num_table_line: %ld, txn_id: %lu"
+                        "op_type: %s",
+                        _region_id, applied_index, _num_table_lines.load(),
+                        txn_id, pb::OpType_Name(op_type).c_str());
             if (ret < 0) {
                 DB_FATAL("write meta info fail, region_id: %ld, txn_id: %lu, log_index: %ld", 
                             _region_id, txn_id, applied_index);
@@ -1693,9 +1707,9 @@ void Region::dml_2pc(const pb::StoreReq& request,
                 && txn_info.primary_region_id() == _region_id) {
                 put_commit_ts(txn_id, txn_info.commit_ts());
             }
-            //DB_WARNING("region_id: %ld relase commit meta mutex,"
-            //            "applied_index: %ld , txn_id: %lu",
-            //            _region_id, applied_index, txn_id);
+            DB_WARNING("Huzx=>region_id: %ld relase commit meta mutex,"
+                        "applied_index: %ld , txn_id: %lu",
+                        _region_id, applied_index, txn_id);
             _commit_meta_mutex.unlock();
         }        
     }));
@@ -1819,7 +1833,7 @@ void Region::dml_2pc(const pb::StoreReq& request,
         txn->set_seq_id(seq_id);
         txn->set_resource(state.resource());
         is_separate = txn->is_separate();
-        // DB_WARNING("seq_id: %d, %d, op:%d", seq_id, plan_map.count(seq_id), op_type);
+        DB_WARNING("Huzx=>seq_id: %d, %d, op:%d", seq_id, is_separate, op_type);
         // commit/rollback命令不加缓存
         if (op_type != pb::OP_COMMIT && op_type != pb::OP_ROLLBACK) {
             pb::CachePlan plan_item;
@@ -1848,7 +1862,7 @@ void Region::dml_2pc(const pb::StoreReq& request,
         response.set_errcode(pb::NOT_LEADER);
         response.set_leader(butil::endpoint2str(get_leader()).c_str());
         response.set_errmsg("not leader, maybe transfer leader");
-        DB_WARNING("no txn found: region_id: %ld, txn_id: %lu:%d, op_type: %d", _region_id, txn_id, seq_id, op_type);
+        DB_WARNING("Huzx=>no txn found: region_id: %ld, txn_id: %lu:%d, op_type: %d", _region_id, txn_id, seq_id, op_type);
         return;
     }
     if (/*txn_info.autocommit() && */(op_type == pb::OP_UPDATE || op_type == pb::OP_INSERT || op_type == pb::OP_DELETE)) {
@@ -1906,7 +1920,11 @@ void Region::dml_2pc(const pb::StoreReq& request,
 void Region::dml_1pc(const pb::StoreReq& request, pb::OpType op_type,
         const pb::Plan& plan, const RepeatedPtrField<pb::TupleDescriptor>& tuples, 
         pb::StoreRes& response, int64_t applied_index, int64_t term, braft::Closure* done) {
-    //DB_WARNING("_num_table_lines:%ld region_id: %ld", _num_table_lines.load(), _region_id);
+    DB_WARNING("Huzx=>_num_table_lines:%ld region_id: %ld, request:%s, plan:%s",
+               _num_table_lines.load(),
+               _region_id,
+               request.DebugString().c_str(),
+               plan.DebugString().c_str());
     QosType type = QOS_DML;
     uint64_t sign = 0;
     if (request.has_sql_sign()) {
@@ -2107,24 +2125,24 @@ void Region::dml_1pc(const pb::StoreReq& request, pb::OpType op_type,
     if (state.txn_id == 0 && done == nullptr) {
         _meta_writer->write_meta_index_and_num_table_lines(_region_id, applied_index, 
                 _data_index, tmp_num_table_lines, txn);
-        //DB_WARNING("write meta info when dml_1pc,"
-        //            " region_id: %ld, num_table_line: %ld, applied_index: %ld", 
-        //            _region_id, tmp_num_table_lines, applied_index);
+        DB_WARNING("Huzx=> write meta info when dml_1pc,"
+                    " region_id: %ld, num_table_line: %ld, applied_index: %ld",
+                    _region_id, tmp_num_table_lines, applied_index);
     }
     if (state.txn_id != 0) {
         // pre_commit 与 commit 之间不能open snapshot
         _commit_meta_mutex.lock();
         _meta_writer->write_pre_commit(_region_id, state.txn_id, tmp_num_table_lines, applied_index); 
-        //DB_WARNING("region_id: %ld lock and write_pre_commit success,"
-        //            " num_table_lines: %ld, applied_index: %ld , txn_id: %lu",
-        //            _region_id, tmp_num_table_lines, _applied_index, state.txn_id);
+        DB_WARNING("Huzx=>region_id: %ld lock and write_pre_commit success,"
+                    " num_table_lines: %ld, applied_index: %ld , txn_id: %lu",
+                    _region_id, tmp_num_table_lines, _applied_index, state.txn_id);
     }
     uint64_t txn_id = state.txn_id;
     ON_SCOPE_EXIT(([this, txn_id, tmp_num_table_lines, applied_index]() {
         if (txn_id != 0) {
-            //DB_WARNING("region_id: %ld release commit meta mutex, "
-            //    " num_table_lines: %ld, applied_index: %ld , txn_id: %lu",
-            //    _region_id, tmp_num_table_lines, applied_index, txn_id);
+            DB_WARNING("Huzx=>region_id: %ld release commit meta mutex, "
+                " num_table_lines: %ld, applied_index: %ld , txn_id: %lu",
+                _region_id, tmp_num_table_lines, applied_index, txn_id);
             _commit_meta_mutex.unlock();
         }        
     }));
@@ -2132,6 +2150,8 @@ void Region::dml_1pc(const pb::StoreReq& request, pb::OpType op_type,
         auto res = txn->commit();
         if (res.ok()) {
             commit_succ = true;
+            DB_WARNING("txn commit success!!! regionId:%ld, txId:%ld, applyIndex:%d",
+                       _region_id, state.txn_id, applied_index);
         } else if (res.IsExpired()) {
             DB_WARNING("txn expired, region_id: %ld, txn_id: %lu, applied_index: %ld", 
                         _region_id, state.txn_id, applied_index);
@@ -2146,7 +2166,6 @@ void Region::dml_1pc(const pb::StoreReq& request, pb::OpType op_type,
                 _num_delete_lines -= txn_num_increase_rows;
             }
             _num_table_lines = tmp_num_table_lines;
-            
         }
     } else {
         commit_succ = true;
@@ -2174,16 +2193,15 @@ void Region::dml_1pc(const pb::StoreReq& request, pb::OpType op_type,
     if (state.txn_id != 0) {
         auto ret = _meta_writer->write_meta_after_commit(_region_id, _num_table_lines,
             applied_index, _data_index, state.txn_id, need_write_rollback);
-        //DB_WARNING("write meta info wheen commit"
-        //            " region_id: %ld, applied_index: %ld, num_table_line: %ld, txn_id: %lu", 
-        //            _region_id, applied_index, _num_table_lines.load(), state.txn_id); 
+        DB_WARNING("Huzx=>write meta info wheen commit"
+                    " region_id: %ld, applied_index: %ld, num_table_line: %ld, txn_id: %lu",
+                    _region_id, applied_index, _num_table_lines.load(), state.txn_id);
         if (ret < 0) {
             DB_FATAL("Write Metainfo fail, region_id: %ld, txn_id: %lu, log_index: %ld", 
                         _region_id, state.txn_id, applied_index);
         }
     }
 
-    
     int64_t dml_cost = cost.get_time();
     bool auto_commit = false;
     if (request.txn_infos_size() > 0) {
@@ -2200,13 +2218,14 @@ void Region::dml_1pc(const pb::StoreReq& request, pb::OpType op_type,
         op_type == pb::OP_COMMIT ||
         op_type == pb::OP_ROLLBACK ||
         op_type == pb::OP_PREPARE) {
-        DB_NOTICE("dml type: %s, time_cost:%ld, region_id: %ld, txn_id: %lu, num_table_lines:%ld, "
+        DB_WARNING("Huzx=>dml type: %s, time_cost:%ld, region_id: %ld, txn_id: %lu, num_table_lines:%ld, "
                   "affected_rows:%d, applied_index:%ld, term:%ld, txn_num_rows:%ld,"
                   " log_id:%lu, wait_cost:%ld", 
                 pb::OpType_Name(op_type).c_str(), dml_cost, _region_id,
                 state.txn_id, _num_table_lines.load(), ret, applied_index, term,
                 txn_num_increase_rows, state.log_id(), wait_cost);
     }
+    DB_WARNING("Huzx=> write response:%s", response.DebugString().c_str());
 }
 
 void Region::kv_apply_raft(RuntimeState* state, SmartTransaction txn) {
@@ -2754,6 +2773,9 @@ void Region::do_apply(int64_t term, int64_t index, const pb::StoreReq& request, 
     _applied_index = index;
     reset_timecost();
     pb::StoreRes res;
+
+    DB_WARNING("Huzx=> current opType:%s", pb::OpType_Name(op_type).c_str());
+
     switch (op_type) {
         //binlog op
         case pb::OP_PREWRITE_BINLOG:
@@ -2786,6 +2808,7 @@ void Region::do_apply(int64_t term, int64_t index, const pb::StoreReq& request, 
         case pb::OP_COMMIT:
         case pb::OP_ROLLBACK: {
             _data_index = _applied_index;
+            DB_WARNING("Huzx=> will apply tx request:%s", request.DebugString().c_str());
             apply_txn_request(request, done, _applied_index, term);
             break;
         }
@@ -2959,6 +2982,9 @@ void Region::on_apply(braft::Iterator& iter) {
         auto term = iter.term();
         auto index = iter.index();
         _braft_apply_index = index;
+
+        DB_WARNING("Huzx=> onApply index:%ld, request:%s", index, request->DebugString().c_str());
+
         if (request->op_type() == pb::OP_ADD_VERSION_FOR_SPLIT_REGION ||
                 (get_version() == 0 && request->op_type() == pb::OP_CLEAR_APPLYING_TXN)) {
             // 异步队列排空
@@ -3381,6 +3407,7 @@ void Region::apply_txn_request(const pb::StoreReq& request, braft::Closure* done
         }
     });
     int ret = 0;
+    DB_WARNING("Huzx===> apply tx request: isExecuteCached:%d", (last_seq < seq_id - 1));
     if (last_seq < seq_id - 1) {
         ret = execute_cached_cmd(request, res, txn_id, txn, index, term, request.log_id());
     }

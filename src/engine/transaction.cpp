@@ -416,8 +416,12 @@ int Transaction::put_primary(int64_t region, IndexInfo& pk_index, SmartRecord re
     if (is_cstore()) {
         return put_primary_columns(key, record, update_fields);
     }
-    //DB_WARNING("put primary, region_id: %ld, index_id: %ld, put_key: %s, put_value: %s",
-    //    region, pk_index.id, rocksdb::Slice(key.data()).ToString(true).c_str(), rocksdb::Slice(value).ToString(true).c_str());
+    DB_WARNING("Huzx=> put primary, isSeperate:%d, region_id: %ld, index_id: %ld, put_key: %s, put_value: %s",
+               _is_separate,
+               region,
+               pk_index.id,
+               rocksdb::Slice(key.data()).ToString(true).c_str(),
+               rocksdb::Slice(value).ToString(true).c_str());
     return 0;
 }
 
@@ -476,8 +480,8 @@ int Transaction::put_secondary(int64_t region, IndexInfo& index, SmartRecord rec
         DB_FATAL("put secondary fail, error: %s", res.ToString().c_str());
         return -1;
     }
-    //DB_WARNING("put secondary, region_id: %ld, index_id: %ld, put_key: %s, put_value: %s",
-    //    region, index.id, rocksdb::Slice(key.data()).ToString(true).c_str(), rocksdb::Slice(pk.data()).ToString(true).c_str());
+    DB_WARNING("Huzx=>put secondary, region_id: %ld, index_id: %ld, put_key: %s, put_value: %s",
+               region, index.id, rocksdb::Slice(key.data()).ToString(true).c_str(), rocksdb::Slice(pk.data()).ToString(true).c_str());
     return 0;
 }
 

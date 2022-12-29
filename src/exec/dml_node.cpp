@@ -199,7 +199,10 @@ int DMLNode::init_schema_info(RuntimeState* state) {
 
 int DMLNode::insert_row(RuntimeState* state, SmartRecord record, bool is_update) {
     _ignore_index_ids.clear();
-    //DB_WARNING_STATE(state, "insert record: %s", record->debug_string().c_str());
+    DB_WARNING("huzx=>state regionId:%d insert record: %s",
+               state->region_id(),
+               record != nullptr ? record->debug_string().c_str() : "nullptr"
+               );
     int ret = 0;
     int affected_rows = 0;
     // update更新部分索引，会在update_row里指定索引
@@ -245,16 +248,19 @@ int DMLNode::insert_row(RuntimeState* state, SmartRecord record, bool is_update)
         if (FLAGS_replace_no_get && _is_replace && _all_indexes.size() == 1) {
             ret = -2;
         } else {
+            DB_WARNING("Huzx==> will get_update_primary: %d by GET_LOCK", _region_id);
             ret = _txn->get_update_primary(_region_id, *_pri_info, old_record, _field_ids, GET_LOCK, true);
         }
         if (ret == -3) {
-            //DB_WARNING_STATE(state, "key not in this region:%ld, %s", _region_id, record->to_string().c_str());
+            DB_WARNING_STATE(state, "====HUZX===> key not in this region:%ld, %s", _region_id, record->to_string().c_str());
             return 0;
         }
         if (ret == -4) {
             //过期的数据被覆盖，但是num_table_lines已经计算过旧数据了
             need_increase = false;
         }
+        DB_WARNING("Huzx====> ret:%d, needIgore:%d, isUpdate:%d, dupKey_update:%d, replace:%d",
+                   ret, _need_ignore, is_update, _on_dup_key_update, _is_replace);
         if (ret != -2 && ret != -4) {
             if (ret == 0) { 
                 if (_need_ignore) {
@@ -319,8 +325,8 @@ int DMLNode::insert_row(RuntimeState* state, SmartRecord record, bool is_update)
         IndexInfo& info = *info_ptr;
 
         auto index_state = info.state;
-        //DB_DEBUG("dml_insert_record prime+index string[%s] state[%s] index_id[%ld] index_name[%s] region_%ld", 
-        //    record->to_string().c_str(), pb::IndexState_Name(index_state).c_str(), info.id, info.name.c_str(), _region_id);
+        DB_WARNING("huzx=>dml_insert_record prime+index string[%s] state[%s] index_id[%ld] index_name[%s] region_%ld",
+            record->to_string().c_str(), pb::IndexState_Name(index_state).c_str(), info.id, info.name.c_str(), _region_id);
 
         if (!_ddl_need_write && (index_state != pb::IS_PUBLIC && index_state != pb::IS_WRITE_ONLY &&
             index_state != pb::IS_WRITE_LOCAL)) {
@@ -338,6 +344,8 @@ int DMLNode::insert_row(RuntimeState* state, SmartRecord record, bool is_update)
             old_record = record->clone(true);
         }
         ret = _txn->get_update_secondary(_region_id, *_pri_info, info, old_record, GET_LOCK, true);
+        DB_WARNING("huzx=> update secondary region id:%ld, ret:%d, isUpdate:%d, ignore:%d, dupKey:%d, replace:%d",
+                   _region_id, ret, is_update, _need_ignore, _on_dup_key_update, _is_replace);
         if (ret == 0) {
             if (is_update) {
                 DB_WARNING_STATE(state, "update uniq key must not exist, "
@@ -435,6 +443,7 @@ int DMLNode::insert_row(RuntimeState* state, SmartRecord record, bool is_update)
             DB_WARNING_STATE(state, "put index:%ld fail:%d, table_id:%ld", info.id, ret, _table_id);
             return ret;
         }
+        DB_WARNING_STATE(state, "huzx ===> put index:%ld success:%d, table_id:%ld", info.id, ret, _table_id);
     }
 
     if (_local_index_binlog && (_is_replace || _need_ignore || _on_dup_key_update || _node_type == pb::UPDATE_NODE)) {
